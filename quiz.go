@@ -9,11 +9,8 @@ import (
 	"math/rand"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
-
-var wg sync.WaitGroup
 
 var (
 	stringFlag   string
@@ -25,7 +22,8 @@ func init() {
 	flag.StringVar(&stringFlag, "csv", "problems.csv",
 		`a csv file in the format of 'question,answer'`)
 	flag.IntVar(&limitFlag, "limit", 30, "the time limit for the quiz in seconds")
-	flag.BoolVar(&isRandomFlag, "random", true, "Randomize the order of the questions")
+	flag.BoolVar(&isRandomFlag, "random", true,
+		"Randomize the order of the questions")
 	flag.Parse()
 }
 
@@ -37,35 +35,35 @@ func main() {
 		log.Fatal(err)
 	}
 
-	correctsCounter := 0
-	fmt.Printf("You have %v seconds. Press enter to start", limitFlag)
-	fmt.Scanln()
-	wg.Add(1)
-	go run(problems, &correctsCounter)
-	go stopWatch(float64(limitFlag))
-	wg.Wait()
+	correctsCounter := run(problems)
 	fmt.Printf("\nYou scored %v out of %v.\n", correctsCounter, len(problems))
 }
 
-func stopWatch(limitFlag float64) {
-	start := time.Now()
-	for time.Since(start).Seconds() < limitFlag {
-		time.Sleep(time.Second)
-	}
-	wg.Done()
+func stopWatch(done chan<- bool) {
+	timer := time.NewTimer(time.Second * time.Duration(limitFlag))
+	<-timer.C
+	done <- true
 }
 
-func run(problems [][]string, correctsCounter *int) {
+func run(problems [][]string) (correctsCounter int) {
 	scanner := bufio.NewScanner(os.Stdin)
-	for i, problem := range problems {
-		fmt.Printf("Problem #%v: %v = ", i, problem[0])
-		scanner.Scan()
-		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
-		if answer == problem[1] {
-			(*correctsCounter)++
+	done := make(chan bool)
+	fmt.Printf("You have %v seconds. Press enter to start", limitFlag)
+	fmt.Scanln()
+	go stopWatch(done)
+	go func(done chan<- bool) {
+		for i, problem := range problems {
+			fmt.Printf("Problem #%v: %v = ", i+1, problem[0])
+			scanner.Scan()
+			answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
+			if answer == problem[1] {
+				correctsCounter++
+			}
 		}
-	}
-	wg.Done()
+		done <- true
+	}(done)
+	<-done
+	return
 }
 
 func readProblems() ([][]string, error) {
