@@ -67,12 +67,12 @@ func run(problems [][]string) (correctsCounter int) {
 }
 
 func readProblems() ([][]string, error) {
-	problemsFile, err := os.Open(stringFlag)
-	defer problemsFile.Close()
 	var problems [][]string
+	problemsFile, err := os.Open(stringFlag)
 	if err != nil {
 		return problems, err
 	}
+	defer problemsFile.Close()
 	reader := csv.NewReader(problemsFile)
 	problems, err = reader.ReadAll()
 	if err != nil {
